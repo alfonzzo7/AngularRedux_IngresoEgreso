@@ -7,13 +7,14 @@ import { Store } from '@ngrx/store';
 import { User } from './user.model';
 import { AppState } from '../app.reducer';
 import { ActivarLoadingAction, DesactivarLoadingAction } from '../shared/ui.actions';
-import { SetUserAction } from './auth.actions';
+import { SetUserAction, UnsetUserAction } from './auth.actions';
 
 import * as firebase from 'firebase';
 
 import Swal from 'sweetalert2';
 import { firebaseMessages } from '../config/config';
 import { Subscription } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 
 @Injectable({
@@ -21,7 +22,7 @@ import { Subscription } from 'rxjs';
 })
 export class AuthService {
 
-  fbUser: firebase.User;
+  private user: User;
   private userSubscription: Subscription = new Subscription();
 
   constructor(private afAuth: AngularFireAuth,
@@ -31,15 +32,16 @@ export class AuthService {
 
   initAuthListener() {
     this.afAuth.authState.subscribe((fbUser: firebase.User) => {
-      this.fbUser = fbUser;
-      if (this.fbUser) {
-        this.userSubscription = this.afDB.doc(`${this.fbUser.uid}/usuario`)
+      if (fbUser) {
+        this.userSubscription = this.afDB.doc(`${fbUser.uid}/usuario`)
           .valueChanges().subscribe((usuarioObj: any) => {
             const newUser = new User(usuarioObj);
             this.store.dispatch(new SetUserAction(newUser));
+            this.user = newUser;
           });
       } else {
         this.userSubscription.unsubscribe();
+        this.user = null;
       }
     });
   }
@@ -97,7 +99,25 @@ export class AuthService {
 
   logoutUsuario() {
     this.router.navigate(['/login']);
-
     this.afAuth.auth.signOut();
+    this.store.dispatch(new UnsetUserAction());
+  }
+
+  isAuth() {
+    return this.afAuth.authState
+      .pipe(
+        map(fbUser => {
+
+          if (fbUser == null) {
+            this.router.navigate(['/login']);
+          }
+
+          return fbUser != null;
+        })
+      );
+  }
+
+  getUsuario() {
+    return {...this.user};
   }
 }
