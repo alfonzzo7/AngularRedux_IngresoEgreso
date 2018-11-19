@@ -1,19 +1,20 @@
 import { Injectable } from '@angular/core';
 import { AngularFireAuth } from '@angular/fire/auth';
 import { AngularFirestore } from '@angular/fire/firestore';
-
+import { Router } from '@angular/router';
 import { Store } from '@ngrx/store';
+
+import { User } from './user.model';
 import { AppState } from '../app.reducer';
 import { ActivarLoadingAction, DesactivarLoadingAction } from '../shared/ui.actions';
-
-import { Router } from '@angular/router';
+import { SetUserAction } from './auth.actions';
 
 import * as firebase from 'firebase';
 
 import Swal from 'sweetalert2';
 import { firebaseMessages } from '../config/config';
+import { Subscription } from 'rxjs';
 
-import { User } from './user.model';
 
 @Injectable({
   providedIn: 'root'
@@ -21,6 +22,7 @@ import { User } from './user.model';
 export class AuthService {
 
   fbUser: firebase.User;
+  private userSubscription: Subscription = new Subscription();
 
   constructor(private afAuth: AngularFireAuth,
               private router: Router,
@@ -30,6 +32,15 @@ export class AuthService {
   initAuthListener() {
     this.afAuth.authState.subscribe((fbUser: firebase.User) => {
       this.fbUser = fbUser;
+      if (this.fbUser) {
+        this.userSubscription = this.afDB.doc(`${this.fbUser.uid}/usuario`)
+          .valueChanges().subscribe((usuarioObj: any) => {
+            const newUser = new User(usuarioObj);
+            this.store.dispatch(new SetUserAction(newUser));
+          });
+      } else {
+        this.userSubscription.unsubscribe();
+      }
     });
   }
 
